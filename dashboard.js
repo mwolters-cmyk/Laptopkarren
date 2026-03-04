@@ -447,8 +447,9 @@ function renderDashboard() {
     const filtered = getFilteredRecords();
     const stats = analyzeData(filtered);
 
-    // Always render non-chart elements (KPIs, heatmap HTML, selectors)
+    // Always render non-chart elements (KPIs, heatmap HTML, selectors, summaries)
     renderKPIs(stats);
+    renderOverzichtSummary(stats);
     renderHeatmap(stats);
     renderCartSelector(stats);
 
@@ -465,6 +466,7 @@ function renderDashboard() {
     const forecast = analyzeForecast(allRecords);
     if (forecast) {
         renderForecastKPIs(forecast);
+        renderToekomstSummary(forecast);
         renderForecastHeatmap(forecast);
         if (activeTab === 'toekomst') {
             renderForecastChart(forecast);
@@ -481,6 +483,88 @@ function renderKPIs(stats) {
     document.getElementById('kpi-canceled').textContent = stats.cancelRate + '%';
     document.getElementById('kpi-peak-day').textContent = stats.peakDay;
     document.getElementById('kpi-peak-hour').textContent = stats.peakHour;
+}
+
+function renderOverzichtSummary(stats) {
+    const el = document.getElementById('summary-overzicht');
+    const cap = stats.capacity;
+    const maxOcc = Math.max(cap.maxOccPerLoc.Athena || 0, cap.maxOccPerLoc.Socrates || 0);
+    const maxOccPct = Math.round(maxOcc * 100);
+    const highPeaks = (cap.highPeaksPerLoc.Athena || 0) + (cap.highPeaksPerLoc.Socrates || 0);
+    const worstLoc = (cap.maxOccPerLoc.Socrates || 0) > (cap.maxOccPerLoc.Athena || 0) ? 'Socrates' : 'Athena';
+
+    // Date range
+    const dates = allRecords.map(r => r.start).filter(d => d).sort((a, b) => a - b);
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    const rangeStr = first && last
+        ? `${first.getDate()} ${MONTHS_NL[first.getMonth()]} ${first.getFullYear()} t/m ${last.getDate()} ${MONTHS_NL[last.getMonth()]} ${last.getFullYear()}`
+        : '';
+
+    let lines = [`<div class="summary-title">Samenvatting</div>`];
+    lines.push(`In de periode <strong>${rangeStr}</strong> zijn <strong>${stats.active.toLocaleString('nl-NL')} reserveringen</strong> geregistreerd door <strong>${stats.teachers} docenten</strong> op ${stats.carts} laptopkarren over twee locaties.`);
+    lines.push(`De drukste dag is <strong>${stats.peakDay}</strong> en het drukste uur is <strong>${stats.peakHour}</strong>. Het annuleringspercentage is ${stats.cancelRate}%.`);
+
+    if (maxOccPct >= 90) {
+        lines.push(`De maximale bezettingsgraad is <strong>${maxOccPct}%</strong> (${worstLoc}), met <strong>${highPeaks} piektijden boven 80%</strong>. De capaciteit staat onder druk.`);
+        lines.push(`<span class="cta danger">Capaciteit monitoren en uitbreiden overwegen</span>`);
+    } else if (maxOccPct >= 70) {
+        lines.push(`De maximale bezettingsgraad is <strong>${maxOccPct}%</strong> (${worstLoc}), met ${highPeaks} piektijden boven 80%. Er is nog ruimte maar piekuren vragen aandacht.`);
+        lines.push(`<span class="cta warning">Piektijden in de gaten houden</span>`);
+    } else {
+        lines.push(`De maximale bezettingsgraad is <strong>${maxOccPct}%</strong> (${worstLoc}). Er is voldoende capaciteit op beide locaties.`);
+    }
+
+    el.innerHTML = lines.join('<br>');
+}
+
+function renderToekomstSummary(forecast) {
+    const el = document.getElementById('summary-toekomst');
+    const locs = activeFilter === 'alle' ? ['Athena', 'Socrates'] : [activeFilter];
+
+    let peakPct = 0, peakLoc = '', weeksOver = 0, extraNeeded = 0;
+    for (const loc of locs) {
+        const s = forecast.summary[loc];
+        if (!s) continue;
+        if (s.peakProjected > peakPct) { peakPct = s.peakProjected; peakLoc = loc; }
+        weeksOver = Math.max(weeksOver, s.weeksOver);
+        extraNeeded = Math.max(extraNeeded, s.extraNeeded);
+    }
+
+    // Find busiest time window
+    let busiestWindow = '', busiestOcc = 0;
+    for (const loc of locs) {
+        const proj = forecast.projection[loc];
+        if (!proj || !proj.length) continue;
+        const lastWeek = proj[proj.length - 1];
+        for (let dow = 1; dow <= 5; dow++) {
+            for (const [twIdx, data] of Object.entries(lastWeek.dayDetails[dow] || {})) {
+                if (data.projected > busiestOcc) {
+                    busiestOcc = data.projected;
+                    busiestWindow = `${DAYS_NL[dow]} ${forecast.timeWindows[twIdx]?.label || ''}`;
+                }
+            }
+        }
+    }
+
+    let lines = [`<div class="summary-title">Prognose module 3</div>`];
+    lines.push(`Op basis van de afgelopen 6 weken en de groeitrend wordt de bezetting in module 3 (eind maart &ndash; eind juni) geprojecteerd.`);
+
+    if (peakPct >= 100) {
+        lines.push(`De verwachte piekbezetting is <strong>${peakPct}%</strong> op ${peakLoc}, wat betekent dat de vraag de beschikbare capaciteit overstijgt. Het drukste moment is <strong>${busiestWindow}</strong>.`);
+        lines.push(`Er zijn naar schatting <strong>${extraNeeded} extra kar(ren)</strong> nodig om piektijden op te vangen. In ${weeksOver} van de ${forecast.summary[locs[0]]?.totalWeeks || '?'} weken wordt een tekort verwacht.`);
+        lines.push(`<span class="cta danger">Capaciteit uitbreiden voor module 3</span>`);
+    } else if (peakPct >= 80) {
+        lines.push(`De verwachte piekbezetting is <strong>${peakPct}%</strong> op ${peakLoc}. Het drukste moment is <strong>${busiestWindow}</strong>. De capaciteit is krap maar toereikend.`);
+        if (extraNeeded > 0) {
+            lines.push(`Overweeg <strong>${extraNeeded} extra kar(ren)</strong> aan te schaffen als buffer voor onverwachte pieken.`);
+        }
+        lines.push(`<span class="cta warning">Capaciteit nauwlettend volgen</span>`);
+    } else {
+        lines.push(`De verwachte piekbezetting is <strong>${peakPct}%</strong> (${peakLoc}). Er is voldoende capaciteit voor module 3. Het drukste moment is <strong>${busiestWindow}</strong>.`);
+    }
+
+    el.innerHTML = lines.join('<br>');
 }
 
 function renderWeeklyChart(stats) {
