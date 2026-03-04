@@ -15,6 +15,7 @@ const COLORS = {
 
 let allRecords = [];
 let activeFilter = 'alle';
+let activeTab = 'overzicht';
 let charts = {};
 
 // ===================== FILE UPLOAD =====================
@@ -60,6 +61,20 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.add('active');
             activeFilter = btn.dataset.filter;
             renderDashboard();
+        });
+    });
+
+    // Tab navigation
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeTab = btn.dataset.tab;
+            // Destroy charts BEFORE hiding tabs (prevents ResizeObserver errors)
+            destroyCharts();
+            document.getElementById('tab-overzicht').classList.toggle('hidden', activeTab !== 'overzicht');
+            document.getElementById('tab-toekomst').classList.toggle('hidden', activeTab !== 'toekomst');
+            if (allRecords.length) renderDashboard();
         });
     });
 });
@@ -432,14 +447,31 @@ function renderDashboard() {
     const filtered = getFilteredRecords();
     const stats = analyzeData(filtered);
 
+    // Always render non-chart elements (KPIs, heatmap HTML, selectors)
     renderKPIs(stats);
-    renderWeeklyChart(stats);
-    renderMonthlyChart(stats);
-    renderWeekdayChart(stats);
     renderHeatmap(stats);
-    renderTop10(stats);
-    renderCapacity(stats);
     renderCartSelector(stats);
+
+    // Only create Chart.js charts for the visible tab
+    if (activeTab === 'overzicht') {
+        renderWeeklyChart(stats);
+        renderMonthlyChart(stats);
+        renderWeekdayChart(stats);
+        renderTop10(stats);
+        renderCapacity(stats);
+    }
+
+    // Forecast tab (always uses all records for complete picture)
+    const forecast = analyzeForecast(allRecords);
+    if (forecast) {
+        renderForecastKPIs(forecast);
+        renderForecastHeatmap(forecast);
+        if (activeTab === 'toekomst') {
+            renderForecastChart(forecast);
+            renderScenarioAnalysis(forecast);
+            renderLatentDemand(forecast);
+        }
+    }
 }
 
 function renderKPIs(stats) {
@@ -805,6 +837,572 @@ function renderCartSelector(stats) {
         }
     });
 }
+
+// ===================== FORECAST ANALYSIS =====================
+
+const TIME_WINDOWS = [
+    { name: 'Ochtend vroeg', label: '08\u201310', start: 8, end: 10 },
+    { name: 'Ochtend laat', label: '10\u201312', start: 10, end: 12 },
+    { name: 'Middag', label: '12\u201314', start: 12, end: 14 },
+    { name: 'Middag laat', label: '14\u201316', start: 14, end: 16 }
+];
+
+function analyzeForecast(records) {
+    const active = records.filter(r => !r.canceled);
+    if (!active.length) return null;
+
+    // Step 1: Build hourly slot data per location
+    const slotData = { Athena: {}, Socrates: {} };
+    const totalCarts = { Athena: new Set(), Socrates: new Set() };
+
+    active.forEach(r => {
+        if (r.cart === 'Onbekend') return;
+        const loc = r.location;
+        if (!totalCarts[loc]) return;
+        totalCarts[loc].add(r.cart);
+
+        const startHour = r.start.getHours();
+        const endHour = r.end.getHours() + (r.end.getMinutes() > 0 ? 1 : 0);
+        const dateStr = r.start.toISOString().slice(0, 10);
+
+        for (let h = startHour; h < endHour; h++) {
+            const key = `${dateStr}_${h}`;
+            if (!slotData[loc][key]) {
+                slotData[loc][key] = { date: dateStr, dayOfWeek: r.start.getDay(), hour: h, carts: new Set() };
+            }
+            slotData[loc][key].carts.add(r.cart);
+        }
+    });
+
+    const cartCounts = {
+        Athena: totalCarts.Athena.size || 1,
+        Socrates: totalCarts.Socrates.size || 1
+    };
+
+    // Step 2: Determine reference period (last 6 weeks with substantial activity)
+    // The data may have sparse future bookings; find the last "full" week
+    const weekResCounts = {};
+    active.forEach(r => {
+        const d = new Date(r.start);
+        d.setDate(d.getDate() - d.getDay() + 1); // Monday
+        const wk = d.toISOString().slice(0, 10);
+        weekResCounts[wk] = (weekResCounts[wk] || 0) + 1;
+    });
+    const sortedWeekEntries = Object.entries(weekResCounts).sort((a, b) => a[0].localeCompare(b[0]));
+    // Median week activity (excluding very low weeks)
+    const weeklyCounts = sortedWeekEntries.map(e => e[1]).sort((a, b) => a - b);
+    const medianActivity = weeklyCounts[Math.floor(weeklyCounts.length / 2)] || 1;
+    const activityThreshold = medianActivity * 0.25; // 25% of median = "real" week
+    // Find the last week with substantial activity
+    let lastFullWeekIdx = sortedWeekEntries.length - 1;
+    while (lastFullWeekIdx >= 0 && sortedWeekEntries[lastFullWeekIdx][1] < activityThreshold) {
+        lastFullWeekIdx--;
+    }
+    if (lastFullWeekIdx < 0) lastFullWeekIdx = sortedWeekEntries.length - 1;
+    const lastFullWeek = sortedWeekEntries[lastFullWeekIdx][0];
+    const refEnd = new Date(lastFullWeek);
+    refEnd.setDate(refEnd.getDate() + 6); // End of that week (Sunday)
+    const refStart = new Date(lastFullWeek);
+    refStart.setDate(refStart.getDate() - 35); // 5 more weeks back (6 total)
+
+    // Step 3: Build weekly pattern from reference period
+    const weekPattern = {};
+
+    for (const loc of ['Athena', 'Socrates']) {
+        weekPattern[loc] = {};
+        const maxC = cartCounts[loc];
+
+        // Organize reference slots by week
+        const weekBuckets = {};
+        for (const [, slot] of Object.entries(slotData[loc])) {
+            const slotDate = new Date(slot.date);
+            if (slotDate < refStart || slotDate > refEnd) continue;
+
+            const d = new Date(slotDate);
+            d.setDate(d.getDate() - d.getDay() + 1); // Monday
+            const weekKey = d.toISOString().slice(0, 10);
+            const dow = slot.dayOfWeek;
+            const h = slot.hour;
+
+            if (!weekBuckets[weekKey]) weekBuckets[weekKey] = {};
+            if (!weekBuckets[weekKey][dow]) weekBuckets[weekKey][dow] = {};
+            weekBuckets[weekKey][dow][h] = slot.carts.size;
+        }
+
+        const refWeekKeys = Object.keys(weekBuckets).sort();
+
+        // For each dow x timeWindow: compute stats across reference weeks
+        for (let dow = 1; dow <= 5; dow++) {
+            weekPattern[loc][dow] = {};
+
+            TIME_WINDOWS.forEach((tw, twIdx) => {
+                const weeklyMaxOcc = [];
+
+                for (const wk of refWeekKeys) {
+                    let maxInWindow = 0;
+                    for (let h = tw.start; h < tw.end; h++) {
+                        const used = weekBuckets[wk]?.[dow]?.[h] || 0;
+                        if (used > maxInWindow) maxInWindow = used;
+                    }
+                    weeklyMaxOcc.push(maxInWindow / maxC);
+                }
+
+                const avg = weeklyMaxOcc.length ? weeklyMaxOcc.reduce((a, b) => a + b) / weeklyMaxOcc.length : 0;
+                const max = weeklyMaxOcc.length ? Math.max(...weeklyMaxOcc) : 0;
+                const at100 = weeklyMaxOcc.filter(o => o >= 1.0).length;
+
+                weekPattern[loc][dow][twIdx] = {
+                    avgOcc: avg,
+                    maxOcc: max,
+                    at100Count: at100,
+                    at100Pct: weeklyMaxOcc.length ? at100 / weeklyMaxOcc.length : 0,
+                    weekCount: weeklyMaxOcc.length
+                };
+            });
+        }
+
+        weekPattern[loc].refWeeks = refWeekKeys;
+    }
+
+    // Step 4: Growth trend - monthly average occupancy
+    const trend = {};
+    for (const loc of ['Athena', 'Socrates']) {
+        const maxC = cartCounts[loc];
+        const monthlySlots = {};
+
+        for (const [, slot] of Object.entries(slotData[loc])) {
+            const monthKey = slot.date.slice(0, 7);
+            if (!monthlySlots[monthKey]) monthlySlots[monthKey] = [];
+            monthlySlots[monthKey].push(slot.carts.size / maxC);
+        }
+
+        const monthKeys = Object.keys(monthlySlots).sort();
+        const monthlyAvg = monthKeys.map(m => ({
+            month: m,
+            avg: monthlySlots[m].reduce((a, b) => a + b) / monthlySlots[m].length
+        }));
+
+        // Linear regression on monthly averages
+        let growthPerMonth = 0;
+        if (monthlyAvg.length >= 2) {
+            const n = monthlyAvg.length;
+            const xMean = (n - 1) / 2;
+            const yMean = monthlyAvg.reduce((s, m) => s + m.avg, 0) / n;
+            let num = 0, den = 0;
+            monthlyAvg.forEach((m, i) => {
+                num += (i - xMean) * (m.avg - yMean);
+                den += (i - xMean) ** 2;
+            });
+            growthPerMonth = den ? num / den : 0;
+        }
+
+        trend[loc] = { growthPerMonth, monthlyAvg };
+    }
+
+    // Step 5: Module 3 projection (late March to end June 2026)
+    const mod3Start = new Date(2026, 2, 23); // March 23
+    const mod3End = new Date(2026, 5, 26);   // June 26
+
+    const projection = {};
+    for (const loc of ['Athena', 'Socrates']) {
+        projection[loc] = [];
+        const maxC = cartCounts[loc];
+        const growth = trend[loc].growthPerMonth;
+
+        // Reference midpoint for growth extrapolation
+        const refWeeks = weekPattern[loc].refWeeks || [];
+        const refMidStr = refWeeks[Math.floor(refWeeks.length / 2)];
+        const refMid = refMidStr ? new Date(refMidStr) : refStart;
+
+        let weekStart = new Date(mod3Start);
+        while (weekStart <= mod3End) {
+            const monthsFromRef = (weekStart.getTime() - refMid.getTime()) / (30.44 * 24 * 3600 * 1000);
+            const growthMultiplier = Math.max(0, 1 + growth * monthsFromRef);
+
+            let weekMaxOcc = 0;
+            let weekTotalOcc = 0;
+            let windowCount = 0;
+            const dayDetails = {};
+
+            for (let dow = 1; dow <= 5; dow++) {
+                dayDetails[dow] = {};
+                TIME_WINDOWS.forEach((tw, twIdx) => {
+                    const base = weekPattern[loc][dow]?.[twIdx];
+                    if (!base || base.weekCount === 0) return;
+
+                    const projectedOcc = base.avgOcc * growthMultiplier;
+                    const projectedMax = base.maxOcc * growthMultiplier;
+
+                    dayDetails[dow][twIdx] = {
+                        projected: projectedOcc,
+                        projectedMax: projectedMax,
+                        demandCarts: projectedOcc * maxC,
+                        maxDemandCarts: projectedMax * maxC,
+                        available: maxC,
+                        overCapacity: projectedMax > 1.0
+                    };
+
+                    weekMaxOcc = Math.max(weekMaxOcc, projectedMax);
+                    weekTotalOcc += projectedOcc;
+                    windowCount++;
+                });
+            }
+
+            projection[loc].push({
+                weekStart: new Date(weekStart),
+                weekLabel: `${weekStart.getDate()} ${MONTHS_NL[weekStart.getMonth()]}`,
+                avgOcc: windowCount ? weekTotalOcc / windowCount : 0,
+                maxOcc: weekMaxOcc,
+                dayDetails
+            });
+
+            weekStart.setDate(weekStart.getDate() + 7);
+        }
+    }
+
+    // Step 6: Latent demand per time window
+    const latentDemand = {};
+    for (const loc of ['Athena', 'Socrates']) {
+        latentDemand[loc] = TIME_WINDOWS.map((tw, twIdx) => {
+            let totalAt100 = 0;
+            let totalWeeks = 0;
+
+            for (let dow = 1; dow <= 5; dow++) {
+                const p = weekPattern[loc][dow]?.[twIdx];
+                if (p && p.weekCount > 0) {
+                    totalAt100 += p.at100Count;
+                    totalWeeks += p.weekCount;
+                }
+            }
+
+            return {
+                window: tw.name,
+                label: tw.label,
+                pctAt100: totalWeeks ? totalAt100 / totalWeeks : 0,
+                isStructural: totalWeeks ? (totalAt100 / totalWeeks) > 0.3 : false
+            };
+        });
+    }
+
+    // Step 7: Scenario analysis (+0, +1, +2, +3 carts)
+    const scenarios = {};
+    for (const loc of ['Athena', 'Socrates']) {
+        scenarios[loc] = [];
+        const maxC = cartCounts[loc];
+
+        for (let extra = 0; extra <= 3; extra++) {
+            const newTotal = maxC + extra;
+            let peakOcc = 0;
+            let overCapacitySlots = 0;
+            let totalSlots = 0;
+
+            for (const week of projection[loc]) {
+                for (let dow = 1; dow <= 5; dow++) {
+                    for (const [, data] of Object.entries(week.dayDetails[dow] || {})) {
+                        totalSlots++;
+                        const occ = data.maxDemandCarts / newTotal;
+                        if (occ > peakOcc) peakOcc = occ;
+                        if (occ > 1.0) overCapacitySlots++;
+                    }
+                }
+            }
+
+            scenarios[loc].push({
+                extra,
+                total: newTotal,
+                peakOcc,
+                overCapacityPct: totalSlots ? overCapacitySlots / totalSlots * 100 : 0
+            });
+        }
+    }
+
+    // Step 8: Summary per location
+    const summary = {};
+    for (const loc of ['Athena', 'Socrates']) {
+        const peakProjected = projection[loc].reduce((max, w) => Math.max(max, w.maxOcc), 0);
+        const weeksOver = projection[loc].filter(w => w.maxOcc > 1.0).length;
+        const maxC = cartCounts[loc];
+        const peakDemandCarts = peakProjected * maxC;
+
+        let extraNeeded = 0;
+        while (peakDemandCarts / (maxC + extraNeeded) > 0.95 && extraNeeded < 10) {
+            extraNeeded++;
+        }
+
+        summary[loc] = {
+            peakProjected: Math.round(peakProjected * 100),
+            weeksOver,
+            extraNeeded,
+            totalWeeks: projection[loc].length
+        };
+    }
+
+    return {
+        weekPattern, trend, projection, latentDemand, scenarios, summary,
+        totalCarts: cartCounts,
+        timeWindows: TIME_WINDOWS,
+        refPeriod: { start: refStart, end: refEnd }
+    };
+}
+
+// ===================== FORECAST RENDERING =====================
+
+function renderForecastKPIs(forecast) {
+    const locations = activeFilter === 'alle' ? ['Athena', 'Socrates'] : [activeFilter];
+    let maxPeak = 0, maxWeeksOver = 0, maxLatent = 0, maxExtra = 0;
+
+    for (const loc of locations) {
+        const s = forecast.summary[loc];
+        if (!s) continue;
+        if (s.peakProjected > maxPeak) maxPeak = s.peakProjected;
+        if (s.weeksOver > maxWeeksOver) maxWeeksOver = s.weeksOver;
+        if (s.extraNeeded > maxExtra) maxExtra = s.extraNeeded;
+
+        (forecast.latentDemand[loc] || []).forEach(d => {
+            if (d.pctAt100 > maxLatent) maxLatent = d.pctAt100;
+        });
+    }
+
+    const peakEl = document.getElementById('fkpi-peak');
+    peakEl.textContent = maxPeak + '%';
+    peakEl.style.color = maxPeak >= 100 ? 'var(--accent-red)' : maxPeak >= 80 ? 'var(--accent)' : 'var(--success)';
+
+    const weeksEl = document.getElementById('fkpi-weeks-over');
+    weeksEl.textContent = maxWeeksOver > 0 ? maxWeeksOver + ' van ' + (forecast.summary[locations[0]]?.totalWeeks || '?') : 'geen';
+    weeksEl.style.color = maxWeeksOver > 0 ? 'var(--accent-red)' : 'var(--success)';
+
+    const latentEl = document.getElementById('fkpi-latent');
+    latentEl.textContent = Math.round(maxLatent * 100) + '% van pieken';
+    latentEl.style.color = maxLatent > 0.3 ? 'var(--accent-red)' : maxLatent > 0.1 ? 'var(--accent)' : 'var(--success)';
+
+    const adviceEl = document.getElementById('fkpi-advice');
+    adviceEl.textContent = maxExtra > 0 ? '+' + maxExtra : 'geen';
+    adviceEl.style.color = maxExtra > 0 ? 'var(--accent-red)' : 'var(--success)';
+}
+
+function forecastHeatColor(occ) {
+    if (occ <= 0.05) return '#f0f3f5';
+    if (occ < 0.3) return 'rgba(39, 174, 96, 0.35)';
+    if (occ < 0.5) return 'rgba(39, 174, 96, 0.6)';
+    if (occ < 0.7) return 'rgba(241, 196, 15, 0.65)';
+    if (occ < 0.85) return 'rgba(230, 126, 34, 0.75)';
+    if (occ <= 1.0) return 'rgba(231, 76, 60, 0.8)';
+    return 'rgba(146, 43, 33, 0.9)';
+}
+
+function renderForecastHeatmap(forecast) {
+    const container = document.getElementById('forecast-heatmap');
+    const dayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr'];
+    const locations = activeFilter === 'alle' ? ['Athena', 'Socrates'] : [activeFilter];
+
+    let html = '<div class="forecast-heatmap-grid">';
+
+    for (const loc of locations) {
+        const proj = forecast.projection[loc];
+        if (!proj || !proj.length) continue;
+        const lastWeek = proj[proj.length - 1];
+
+        html += `<div><h3>${loc} (${forecast.totalCarts[loc]} karren)</h3>`;
+        html += '<table><thead><tr><th></th>';
+        forecast.timeWindows.forEach(tw => { html += `<th>${tw.label}</th>`; });
+        html += '</tr></thead><tbody>';
+
+        for (let dow = 1; dow <= 5; dow++) {
+            html += `<tr><th>${dayLabels[dow - 1]}</th>`;
+            forecast.timeWindows.forEach((tw, twIdx) => {
+                const data = lastWeek.dayDetails[dow]?.[twIdx];
+                const occ = data ? data.projected : 0;
+                const pct = Math.round(occ * 100);
+                const bg = forecastHeatColor(occ);
+                const textColor = occ > 0.55 ? 'white' : '#333';
+                html += `<td style="background:${bg};color:${textColor}" title="${dayLabels[dow-1]} ${tw.name}: ${pct}%">${pct}%</td>`;
+            });
+            html += '</tr>';
+        }
+
+        html += '</tbody></table></div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderForecastChart(forecast) {
+    const locations = activeFilter === 'alle' ? ['Athena', 'Socrates'] : [activeFilter];
+    const datasets = [];
+    let labels = [];
+
+    for (const loc of locations) {
+        const proj = forecast.projection[loc] || [];
+        if (proj.length > labels.length) {
+            labels = proj.map(w => w.weekLabel);
+        }
+
+        datasets.push({
+            label: `${loc} gem. bezetting`,
+            data: proj.map(w => Math.round(w.avgOcc * 100)),
+            borderColor: loc === 'Athena' ? COLORS.athena : COLORS.socrates,
+            backgroundColor: loc === 'Athena' ? COLORS.athenaBg : COLORS.socratesBg,
+            fill: true,
+            tension: 0.3
+        });
+
+        datasets.push({
+            label: `${loc} piekbezetting`,
+            data: proj.map(w => Math.round(w.maxOcc * 100)),
+            borderColor: loc === 'Athena' ? COLORS.athena : COLORS.socrates,
+            borderDash: [5, 5],
+            fill: false,
+            tension: 0.3,
+            pointRadius: 2
+        });
+    }
+
+    // Reference lines
+    datasets.push({
+        label: 'Capaciteitsgrens (100%)',
+        data: labels.map(() => 100),
+        borderColor: 'rgba(231, 76, 60, 0.5)',
+        borderDash: [8, 4],
+        pointRadius: 0,
+        fill: false
+    });
+
+    datasets.push({
+        label: 'Waarschuwing (80%)',
+        data: labels.map(() => 80),
+        borderColor: 'rgba(230, 126, 34, 0.35)',
+        borderDash: [4, 4],
+        pointRadius: 0,
+        fill: false
+    });
+
+    const maxY = Math.max(120, ...datasets.flatMap(d => (d.data || []).filter(v => typeof v === 'number'))) + 10;
+
+    charts.forecast = new Chart(document.getElementById('chart-forecast'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: maxY,
+                    title: { display: true, text: 'Bezettingsgraad (%)' },
+                    ticks: { callback: v => v + '%' }
+                }
+            }
+        }
+    });
+}
+
+function renderScenarioAnalysis(forecast) {
+    const container = document.getElementById('scenario-table-container');
+    const locations = activeFilter === 'alle' ? ['Athena', 'Socrates'] : [activeFilter];
+
+    let html = '<table class="scenario-table"><thead><tr>';
+    html += '<th></th><th>Huidig</th><th>+1 kar</th><th>+2 karren</th><th>+3 karren</th>';
+    html += '</tr></thead><tbody>';
+
+    for (const loc of locations) {
+        const scen = forecast.scenarios[loc] || [];
+        if (!scen.length) continue;
+
+        html += `<tr class="loc-header"><td colspan="5">${loc}</td></tr>`;
+
+        html += '<tr><td>Totaal karren</td>';
+        scen.forEach(s => { html += `<td>${s.total}</td>`; });
+        html += '</tr>';
+
+        html += '<tr><td>Verwachte piekbezetting</td>';
+        scen.forEach(s => {
+            const pct = Math.round(s.peakOcc * 100);
+            let cls = 'low';
+            if (pct >= 100) cls = 'high';
+            else if (pct >= 80) cls = 'medium';
+            html += `<td><span class="badge ${cls}">${pct}%</span></td>`;
+        });
+        html += '</tr>';
+
+        html += '<tr><td>Momenten boven 100%</td>';
+        scen.forEach(s => {
+            html += `<td>${Math.round(s.overCapacityPct)}%</td>`;
+        });
+        html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    // Scenario bar chart
+    const scenLabels = ['Huidig', '+1 kar', '+2 karren', '+3 karren'];
+    const chartDatasets = [];
+
+    for (const loc of locations) {
+        const scen = forecast.scenarios[loc] || [];
+        chartDatasets.push({
+            label: loc,
+            data: scen.map(s => Math.round(s.peakOcc * 100)),
+            backgroundColor: loc === 'Athena' ? COLORS.athena : COLORS.socrates,
+            borderRadius: 4
+        });
+    }
+
+    charts.scenario = new Chart(document.getElementById('chart-scenario'), {
+        type: 'bar',
+        data: { labels: scenLabels, datasets: chartDatasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Piekbezetting (%)' },
+                    ticks: { callback: v => v + '%' }
+                }
+            }
+        }
+    });
+}
+
+function renderLatentDemand(forecast) {
+    const locations = activeFilter === 'alle' ? ['Athena', 'Socrates'] : [activeFilter];
+    const labels = forecast.timeWindows.map(tw => tw.name);
+    const datasets = [];
+
+    for (const loc of locations) {
+        const data = (forecast.latentDemand[loc] || []).map(d => Math.round(d.pctAt100 * 100));
+        datasets.push({
+            label: loc,
+            data,
+            backgroundColor: loc === 'Athena' ? COLORS.athena : COLORS.socrates,
+            borderRadius: 4
+        });
+    }
+
+    charts.latent = new Chart(document.getElementById('chart-latent'), {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: { display: true, text: 'Weken op 100% capaciteit (%)' },
+                    ticks: { callback: v => v + '%' }
+                }
+            }
+        }
+    });
+}
+
+// ===================== CART DETAILS =====================
 
 function renderCartDetails(cartName, cartData, allMonthly) {
     // Chart

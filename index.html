@@ -33,34 +33,6 @@
         <!-- Dashboard content (hidden until data loaded) -->
         <div id="dashboard" class="hidden">
 
-            <!-- KPI kaarten -->
-            <section id="kpi-section">
-                <div class="kpi-card">
-                    <div class="kpi-value" id="kpi-total">0</div>
-                    <div class="kpi-label">Totaal reserveringen</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-value" id="kpi-teachers">0</div>
-                    <div class="kpi-label">Unieke docenten</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-value" id="kpi-carts">0</div>
-                    <div class="kpi-label">Actieve karren</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-value" id="kpi-canceled">0%</div>
-                    <div class="kpi-label">Annuleringen</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-value" id="kpi-peak-day">-</div>
-                    <div class="kpi-label">Drukste dag</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-value" id="kpi-peak-hour">-</div>
-                    <div class="kpi-label">Drukste uur</div>
-                </div>
-            </section>
-
             <!-- Locatie filter -->
             <section id="filter-section">
                 <div class="filter-group">
@@ -71,95 +43,206 @@
                 </div>
             </section>
 
-            <!-- Trend analyse -->
-            <section class="chart-section">
-                <h2>Trend: Reserveringen per week</h2>
-                <div class="chart-container wide">
-                    <canvas id="chart-weekly"></canvas>
-                </div>
-            </section>
+            <!-- Tab navigatie -->
+            <nav id="tab-nav">
+                <button class="tab-btn active" data-tab="overzicht">Overzicht</button>
+                <button class="tab-btn" data-tab="toekomst">Toekomst</button>
+            </nav>
 
-            <section class="chart-section">
-                <h2>Reserveringen per maand</h2>
-                <div class="chart-container wide">
-                    <canvas id="chart-monthly"></canvas>
-                </div>
-            </section>
+            <!-- === TAB: Overzicht === -->
+            <div id="tab-overzicht">
 
-            <!-- Populaire dagen & tijden -->
-            <div class="chart-grid">
+                <!-- KPI kaarten -->
+                <section id="kpi-section">
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="kpi-total">0</div>
+                        <div class="kpi-label">Totaal reserveringen</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="kpi-teachers">0</div>
+                        <div class="kpi-label">Unieke docenten</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="kpi-carts">0</div>
+                        <div class="kpi-label">Actieve karren</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="kpi-canceled">0%</div>
+                        <div class="kpi-label">Annuleringen</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="kpi-peak-day">-</div>
+                        <div class="kpi-label">Drukste dag</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="kpi-peak-hour">-</div>
+                        <div class="kpi-label">Drukste uur</div>
+                    </div>
+                </section>
+
+                <!-- Trend analyse -->
                 <section class="chart-section">
-                    <h2>Reserveringen per weekdag</h2>
-                    <div class="chart-container">
-                        <canvas id="chart-weekday"></canvas>
+                    <h2>Trend: Reserveringen per week</h2>
+                    <div class="chart-container wide">
+                        <canvas id="chart-weekly"></canvas>
                     </div>
                 </section>
 
                 <section class="chart-section">
-                    <h2>Heatmap: dag vs tijdslot</h2>
-                    <div class="chart-container">
-                        <div id="heatmap"></div>
+                    <h2>Reserveringen per maand</h2>
+                    <div class="chart-container wide">
+                        <canvas id="chart-monthly"></canvas>
                     </div>
                 </section>
+
+                <!-- Populaire dagen & tijden -->
+                <div class="chart-grid">
+                    <section class="chart-section">
+                        <h2>Reserveringen per weekdag</h2>
+                        <div class="chart-container">
+                            <canvas id="chart-weekday"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="chart-section">
+                        <h2>Heatmap: dag vs tijdslot</h2>
+                        <div class="chart-container">
+                            <div id="heatmap"></div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Top 10 gebruikers -->
+                <div class="chart-grid">
+                    <section class="chart-section">
+                        <h2>Top 10 docenten - Athena</h2>
+                        <div class="chart-container">
+                            <canvas id="chart-top10-athena"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="chart-section">
+                        <h2>Top 10 docenten - Socrates</h2>
+                        <div class="chart-container">
+                            <canvas id="chart-top10-socrates"></canvas>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Capaciteitsanalyse -->
+                <section class="chart-section">
+                    <h2>Capaciteitsanalyse</h2>
+                    <div id="capacity-summary"></div>
+                    <div class="chart-container wide">
+                        <canvas id="chart-capacity"></canvas>
+                    </div>
+                </section>
+
+                <section class="chart-section">
+                    <h2>Piektijden met hoge bezetting</h2>
+                    <div id="peak-table-container">
+                        <table id="peak-table">
+                            <thead>
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Tijdslot</th>
+                                    <th>Locatie</th>
+                                    <th>Karren in gebruik</th>
+                                    <th>Beschikbaar</th>
+                                    <th>Bezetting</th>
+                                </tr>
+                            </thead>
+                            <tbody id="peak-table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Per kar overzicht -->
+                <section class="chart-section">
+                    <h2>Per kar overzicht</h2>
+                    <div class="filter-group">
+                        <label for="cart-select">Selecteer kar:</label>
+                        <select id="cart-select"></select>
+                    </div>
+                    <div class="chart-container wide">
+                        <canvas id="chart-cart-usage"></canvas>
+                    </div>
+                    <div id="cart-stats"></div>
+                </section>
+
             </div>
 
-            <!-- Top 10 gebruikers -->
-            <div class="chart-grid">
-                <section class="chart-section">
-                    <h2>Top 10 docenten - Athena</h2>
-                    <div class="chart-container">
-                        <canvas id="chart-top10-athena"></canvas>
+            <!-- === TAB: Toekomst === -->
+            <div id="tab-toekomst" class="hidden">
+
+                <!-- Forecast KPI kaarten -->
+                <section id="forecast-kpi-section">
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fkpi-peak">-</div>
+                        <div class="kpi-label">Verwachte piekbezetting</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fkpi-weeks-over">-</div>
+                        <div class="kpi-label">Weken boven capaciteit</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fkpi-latent">-</div>
+                        <div class="kpi-label">Onderdrukte vraag</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fkpi-advice">-</div>
+                        <div class="kpi-label">Extra karren nodig</div>
                     </div>
                 </section>
 
+                <!-- Methode uitleg -->
                 <section class="chart-section">
-                    <h2>Top 10 docenten - Socrates</h2>
-                    <div class="chart-container">
-                        <canvas id="chart-top10-socrates"></canvas>
+                    <h2>Over deze prognose</h2>
+                    <p class="forecast-explanation">
+                        Deze prognose is gebaseerd op het gebruikspatroon van de afgelopen 6 weken,
+                        doorgetrokken naar module 3 (eind maart &ndash; eind juni). Bezettingswaarden boven
+                        100% geven aan dat de verwachte vraag groter is dan de beschikbare capaciteit.
+                        Historische bezetting was begrensd op 100%, waardoor de werkelijke vraag op
+                        piektijden hoger kan zijn geweest dan gemeten.
+                    </p>
+                </section>
+
+                <!-- Forecast heatmap -->
+                <section class="chart-section">
+                    <h2>Verwacht bezettingspatroon &mdash; eind module 3</h2>
+                    <div id="forecast-heatmap"></div>
+                </section>
+
+                <!-- Projectie chart -->
+                <section class="chart-section">
+                    <h2>Bezettingsprognose per week</h2>
+                    <div class="chart-container wide">
+                        <canvas id="chart-forecast"></canvas>
                     </div>
                 </section>
+
+                <!-- Scenario analyse -->
+                <section class="chart-section">
+                    <h2>Scenarioanalyse: extra karren</h2>
+                    <div id="scenario-table-container"></div>
+                    <div class="chart-container">
+                        <canvas id="chart-scenario"></canvas>
+                    </div>
+                </section>
+
+                <!-- Latente vraag -->
+                <section class="chart-section">
+                    <h2>Onderdrukte vraag per dagdeel</h2>
+                    <p class="forecast-explanation">
+                        Percentage weken in de referentieperiode waarin alle karren bezet waren.
+                        Op deze momenten is de werkelijke vraag onbekend maar hoger dan de capaciteit.
+                    </p>
+                    <div class="chart-container">
+                        <canvas id="chart-latent"></canvas>
+                    </div>
+                </section>
+
             </div>
-
-            <!-- Capaciteitsanalyse -->
-            <section class="chart-section">
-                <h2>Capaciteitsanalyse</h2>
-                <div id="capacity-summary"></div>
-                <div class="chart-container wide">
-                    <canvas id="chart-capacity"></canvas>
-                </div>
-            </section>
-
-            <section class="chart-section">
-                <h2>Piektijden met hoge bezetting</h2>
-                <div id="peak-table-container">
-                    <table id="peak-table">
-                        <thead>
-                            <tr>
-                                <th>Datum</th>
-                                <th>Tijdslot</th>
-                                <th>Locatie</th>
-                                <th>Karren in gebruik</th>
-                                <th>Beschikbaar</th>
-                                <th>Bezetting</th>
-                            </tr>
-                        </thead>
-                        <tbody id="peak-table-body"></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Per kar overzicht -->
-            <section class="chart-section">
-                <h2>Per kar overzicht</h2>
-                <div class="filter-group">
-                    <label for="cart-select">Selecteer kar:</label>
-                    <select id="cart-select"></select>
-                </div>
-                <div class="chart-container wide">
-                    <canvas id="chart-cart-usage"></canvas>
-                </div>
-                <div id="cart-stats"></div>
-            </section>
 
         </div>
     </main>

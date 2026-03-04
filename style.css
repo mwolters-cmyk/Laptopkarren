@@ -398,6 +398,133 @@ footer {
     font-size: 0.82rem;
 }
 
+/* === Tab Navigation === */
+#tab-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+}
+
+.tab-btn {
+    padding: 0.6rem 1.5rem;
+    border: none;
+    background: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-light);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+}
+
+.tab-btn:hover {
+    color: var(--primary-light);
+}
+
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+/* === Forecast KPIs === */
+#forecast-kpi-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* === Forecast Explanation === */
+.forecast-explanation {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+
+/* === Forecast Heatmap === */
+#forecast-heatmap {
+    overflow-x: auto;
+}
+
+.forecast-heatmap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.forecast-heatmap-grid h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+}
+
+#forecast-heatmap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+#forecast-heatmap th,
+#forecast-heatmap td {
+    padding: 0.5rem 0.6rem;
+    text-align: center;
+    border: 1px solid var(--border);
+}
+
+#forecast-heatmap th {
+    background: var(--bg);
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+#forecast-heatmap td {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* === Scenario Table === */
+#scenario-table-container {
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+}
+
+.scenario-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.scenario-table th {
+    background: var(--primary);
+    color: white;
+    padding: 0.5rem 0.8rem;
+    text-align: center;
+}
+
+.scenario-table th:first-child {
+    text-align: left;
+}
+
+.scenario-table td {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+}
+
+.scenario-table td:first-child {
+    text-align: left;
+    font-weight: 600;
+}
+
+.scenario-table tr.loc-header td {
+    background: var(--bg);
+    font-weight: 700;
+    color: var(--primary);
+}
+
 /* === Utilities === */
 .hidden {
     display: none !important;
@@ -405,11 +532,13 @@ footer {
 
 /* === Responsive === */
 @media (max-width: 768px) {
-    .chart-grid {
+    .chart-grid,
+    .forecast-heatmap-grid {
         grid-template-columns: 1fr;
     }
 
-    #kpi-section {
+    #kpi-section,
+    #forecast-kpi-section {
         grid-template-columns: repeat(2, 1fr);
     }
 
@@ -423,7 +552,8 @@ footer {
 }
 
 @media (max-width: 480px) {
-    #kpi-section {
+    #kpi-section,
+    #forecast-kpi-section {
         grid-template-columns: 1fr 1fr;
     }
 
