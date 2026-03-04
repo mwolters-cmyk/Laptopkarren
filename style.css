@@ -1,0 +1,433 @@
+/* === Reset & Base === */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --primary: #1a5276;
+    --primary-light: #2980b9;
+    --accent: #e67e22;
+    --accent-red: #e74c3c;
+    --success: #27ae60;
+    --bg: #f4f6f8;
+    --card-bg: #ffffff;
+    --text: #2c3e50;
+    --text-light: #7f8c8d;
+    --border: #dce1e6;
+    --radius: 10px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* === Header === */
+header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    padding: 1.5rem 2rem;
+    text-align: center;
+}
+
+header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+header .subtitle {
+    opacity: 0.85;
+    font-size: 0.95rem;
+    margin-top: 0.2rem;
+}
+
+/* === Main === */
+main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+/* === Upload Zone === */
+#upload-section {
+    margin-bottom: 1.5rem;
+}
+
+#drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    background: var(--card-bg);
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+}
+
+#drop-zone.drag-over {
+    border-color: var(--primary-light);
+    background: #eaf2f8;
+}
+
+#drop-zone .drop-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+#drop-zone .file-label {
+    color: var(--primary-light);
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+#drop-zone .drop-hint {
+    color: var(--text-light);
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+#file-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 0.8rem 1.2rem;
+    box-shadow: var(--shadow);
+    font-size: 0.9rem;
+}
+
+#file-info #file-name {
+    font-weight: 600;
+}
+
+#file-info #file-date {
+    color: var(--text-light);
+}
+
+#file-info #clear-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: var(--text-light);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+#file-info #clear-btn:hover {
+    background: #fee;
+    color: var(--accent-red);
+}
+
+/* === KPI Cards === */
+#kpi-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.kpi-label {
+    font-size: 0.82rem;
+    color: var(--text-light);
+    margin-top: 0.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* === Filters === */
+#filter-section {
+    margin-bottom: 1.5rem;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.filter-btn {
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+}
+
+.filter-btn:hover {
+    border-color: var(--primary-light);
+    color: var(--primary-light);
+}
+
+.filter-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* === Chart Sections === */
+.chart-section {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.chart-section h2 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+}
+
+.chart-container {
+    position: relative;
+    width: 100%;
+    min-height: 300px;
+}
+
+.chart-container.wide {
+    min-height: 350px;
+}
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+/* === Heatmap === */
+#heatmap {
+    overflow-x: auto;
+}
+
+#heatmap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+#heatmap th,
+#heatmap td {
+    padding: 0.4rem 0.5rem;
+    text-align: center;
+    border: 1px solid var(--border);
+    min-width: 48px;
+}
+
+#heatmap th {
+    background: var(--bg);
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+#heatmap td {
+    color: white;
+    font-weight: 600;
+}
+
+/* === Capacity Summary === */
+#capacity-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.capacity-card {
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
+}
+
+.capacity-card.warning {
+    border-left-color: var(--accent);
+    background: #fef9e7;
+}
+
+.capacity-card.danger {
+    border-left-color: var(--accent-red);
+    background: #fdedec;
+}
+
+.capacity-card.ok {
+    border-left-color: var(--success);
+    background: #eafaf1;
+}
+
+.capacity-card h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+}
+
+.capacity-card p {
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.capacity-card .stat {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text);
+}
+
+/* === Tables === */
+#peak-table-container {
+    overflow-x: auto;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#peak-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+#peak-table th {
+    background: var(--primary);
+    color: white;
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    position: sticky;
+    top: 0;
+}
+
+#peak-table td {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+}
+
+#peak-table tr:hover td {
+    background: #eaf2f8;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge.high {
+    background: #fdedec;
+    color: var(--accent-red);
+}
+
+.badge.medium {
+    background: #fef9e7;
+    color: #d68910;
+}
+
+.badge.low {
+    background: #eafaf1;
+    color: var(--success);
+}
+
+/* === Cart Select === */
+#cart-select {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: var(--card-bg);
+    min-width: 250px;
+}
+
+#cart-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.8rem;
+    margin-top: 1rem;
+}
+
+.cart-stat {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 0.8rem;
+    text-align: center;
+}
+
+.cart-stat .value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.cart-stat .label {
+    font-size: 0.78rem;
+    color: var(--text-light);
+}
+
+/* === Footer === */
+footer {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--text-light);
+    font-size: 0.82rem;
+}
+
+/* === Utilities === */
+.hidden {
+    display: none !important;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+    .chart-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #kpi-section {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    main {
+        padding: 1rem;
+    }
+
+    .chart-container {
+        min-height: 250px;
+    }
+}
+
+@media (max-width: 480px) {
+    #kpi-section {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    header h1 {
+        font-size: 1.3rem;
+    }
+}

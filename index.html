@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laptopkarren Dashboard - Stedelijk Gymnasium Leiden</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Laptopkarren Dashboard</h1>
+        <p class="subtitle">Stedelijk Gymnasium Leiden</p>
+    </header>
+
+    <main>
+        <!-- Upload sectie -->
+        <section id="upload-section">
+            <div id="drop-zone">
+                <div class="drop-icon">📂</div>
+                <p>Sleep een Excel-bestand hierheen of <label for="file-input" class="file-label">kies een bestand</label></p>
+                <input type="file" id="file-input" accept=".xlsx,.xls" hidden>
+                <p class="drop-hint">Verwacht formaat: Excel met tabbladen Athena en Socrates</p>
+            </div>
+            <div id="file-info" class="hidden">
+                <span id="file-name"></span>
+                <span id="file-date"></span>
+                <button id="clear-btn" title="Wis data">✕</button>
+            </div>
+        </section>
+
+        <!-- Dashboard content (hidden until data loaded) -->
+        <div id="dashboard" class="hidden">
+
+            <!-- KPI kaarten -->
+            <section id="kpi-section">
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-total">0</div>
+                    <div class="kpi-label">Totaal reserveringen</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-teachers">0</div>
+                    <div class="kpi-label">Unieke docenten</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-carts">0</div>
+                    <div class="kpi-label">Actieve karren</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-canceled">0%</div>
+                    <div class="kpi-label">Annuleringen</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-peak-day">-</div>
+                    <div class="kpi-label">Drukste dag</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-peak-hour">-</div>
+                    <div class="kpi-label">Drukste uur</div>
+                </div>
+            </section>
+
+            <!-- Locatie filter -->
+            <section id="filter-section">
+                <div class="filter-group">
+                    <label>Locatie:</label>
+                    <button class="filter-btn active" data-filter="alle">Alle</button>
+                    <button class="filter-btn" data-filter="Athena">Athena</button>
+                    <button class="filter-btn" data-filter="Socrates">Socrates</button>
+                </div>
+            </section>
+
+            <!-- Trend analyse -->
+            <section class="chart-section">
+                <h2>Trend: Reserveringen per week</h2>
+                <div class="chart-container wide">
+                    <canvas id="chart-weekly"></canvas>
+                </div>
+            </section>
+
+            <section class="chart-section">
+                <h2>Reserveringen per maand</h2>
+                <div class="chart-container wide">
+                    <canvas id="chart-monthly"></canvas>
+                </div>
+            </section>
+
+            <!-- Populaire dagen & tijden -->
+            <div class="chart-grid">
+                <section class="chart-section">
+                    <h2>Reserveringen per weekdag</h2>
+                    <div class="chart-container">
+                        <canvas id="chart-weekday"></canvas>
+                    </div>
+                </section>
+
+                <section class="chart-section">
+                    <h2>Heatmap: dag vs tijdslot</h2>
+                    <div class="chart-container">
+                        <div id="heatmap"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Top 10 gebruikers -->
+            <div class="chart-grid">
+                <section class="chart-section">
+                    <h2>Top 10 docenten - Athena</h2>
+                    <div class="chart-container">
+                        <canvas id="chart-top10-athena"></canvas>
+                    </div>
+                </section>
+
+                <section class="chart-section">
+                    <h2>Top 10 docenten - Socrates</h2>
+                    <div class="chart-container">
+                        <canvas id="chart-top10-socrates"></canvas>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Capaciteitsanalyse -->
+            <section class="chart-section">
+                <h2>Capaciteitsanalyse</h2>
+                <div id="capacity-summary"></div>
+                <div class="chart-container wide">
+                    <canvas id="chart-capacity"></canvas>
+                </div>
+            </section>
+
+            <section class="chart-section">
+                <h2>Piektijden met hoge bezetting</h2>
+                <div id="peak-table-container">
+                    <table id="peak-table">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Tijdslot</th>
+                                <th>Locatie</th>
+                                <th>Karren in gebruik</th>
+                                <th>Beschikbaar</th>
+                                <th>Bezetting</th>
+                            </tr>
+                        </thead>
+                        <tbody id="peak-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Per kar overzicht -->
+            <section class="chart-section">
+                <h2>Per kar overzicht</h2>
+                <div class="filter-group">
+                    <label for="cart-select">Selecteer kar:</label>
+                    <select id="cart-select"></select>
+                </div>
+                <div class="chart-container wide">
+                    <canvas id="chart-cart-usage"></canvas>
+                </div>
+                <div id="cart-stats"></div>
+            </section>
+
+        </div>
+    </main>
+
+    <footer>
+        <p>Laptopkarren Dashboard &mdash; Stedelijk Gymnasium Leiden</p>
+    </footer>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
